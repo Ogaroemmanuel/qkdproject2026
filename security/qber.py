@@ -1,31 +1,12 @@
-def calculate_qber(sent_bits, received_bits):
+def calculate_organic_qber(counts, original_pair):
     """
-    Calculates the Quantum Bit Error Rate (QBER).
-    Formula: (Number of error bits / Total number of transmitted bits) * 100
+    Analyzes the probability distribution of all Qiskit shots directly.
     """
-    # Ensure both strings are the same length before comparing
-    if len(sent_bits) != len(received_bits):
-        raise ValueError("Sent and received bit strings must be of equal length.")
-        
-    total_bits = len(sent_bits)
-    
-    # Zip pairs up the bits (e.g., sent[0] with received[0]) so we can compare them
-    error_count = sum(1 for s, r in zip(sent_bits, received_bits) if s != r)
-    
-    # Calculate percentage
-    qber_percentage = (error_count / total_bits) * 100.0
-    
-    return qber_percentage, error_count, total_bits
-
-# Test the function using the exact output from your terminal
-if __name__ == "__main__":
-    test_sent = "10110001"
-    test_received = "00110001"
-    
-    qber, errors, total = calculate_qber(test_sent, test_received)
-    
-    print("--- QBER Calculation Test ---")
-    print(f"Sent:     {test_sent}")
-    print(f"Received: {test_received}")
-    print(f"Errors Detected: {errors} out of {total} bits")
-    print(f"Calculated QBER: {qber}%")
+    total_bit_errors = 0
+    for measured_state, count in counts.items():
+        if measured_state != original_pair:
+            # Count how many individual bits are wrong in this pair
+            bit_errors = sum(1 for a, b in zip(original_pair, measured_state) if a != b)
+            total_bit_errors += bit_errors * count
+            
+    return total_bit_errors

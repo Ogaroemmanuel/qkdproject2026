@@ -1,18 +1,28 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import time
 from security.controller import run_simulation
-from database.db_manager import init_db, log_simulation, fetch_logs, register_user, authenticate_user
+from database.db_manager import (
+    init_db, log_simulation, fetch_logs, register_user, 
+    authenticate_user, create_session, verify_session, destroy_session
+)
 
 init_db()
 st.set_page_config(page_title="SD-QKD Simulation", layout="wide")
 
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-if "username" not in st.session_state:
-    st.session_state["username"] = ""
+current_token = st.query_params.get("session")
+active_user = None
 
-if not st.session_state["logged_in"]:
+if current_token:
+    active_user = verify_session(current_token, max_idle_minutes=15)
+    if not active_user:
+        st.error("Session expired due to inactivity. Please log in again.")
+        del st.query_params["session"]
+        time.sleep(2)
+        st.rerun()
+
+if not active_user:
     st.title("🔐 SD-QKD System Access")
     tab1, tab2 = st.tabs(["Login", "Register"])
     
@@ -22,8 +32,8 @@ if not st.session_state["logged_in"]:
         login_pass = st.text_input("Password", type="password", key="login_pass")
         if st.button("Login"):
             if authenticate_user(login_user, login_pass):
-                st.session_state["logged_in"] = True
-                st.session_state["username"] = login_user
+                new_token = create_session(login_user)
+                st.query_params["session"] = new_token
                 st.rerun()
             else:
                 st.error("Invalid username or password.")
@@ -37,52 +47,41 @@ if not st.session_state["logged_in"]:
                 if register_user(reg_user, reg_pass):
                     st.success("Registration successful! You can now log in.")
                 else:
-                    st.error("Username already exists. Choose another.")
+                    st.error("Username already exists.")
             else:
                 st.warning("Please fill in both fields.")
 
 else:
-    st.sidebar.success(f"Logged in as: {st.session_state['username']}")
+    st.sidebar.success(f"Logged in as: {active_user}")
     if st.sidebar.button("Logout"):
-        st.session_state["logged_in"] = False
-        st.session_state["username"] = ""
+        destroy_session(current_token)
+        del st.query_params["session"]
         st.rerun()
 
     st.title("Superdense QKD Web Authentication Simulator")
     
     st.sidebar.header("Configuration Parameters")
-    key_size = st.sidebar.selectbox("Key Sequence Size", [8, 16], index=1)
-    num_shots = st.sidebar.slider("Simulation Shots", min_value=1, max_value=4096, value=1024, step=100)
+    key_size = st.sidebar.selectbox("Key Sequence Size", [8, 16, 32], index=1)
+    num_shots = st.sidebar.slider("Simulation Shots", min_value=128, max_value=4096, value=1024, step=128)
     eve_active = st.sidebar.toggle("Activate MITM Eavesdropper (Eve)", value=False)
 
     if st.sidebar.button("Start Simulation"):
+        st.subheader("📡 Live Quantum Network Simulation")
         
-        # --- 1. VISUAL NETWORK TOPOLOGY ---
-        st.subheader("📡 Live Network Transmission Simulation")
-        
-        # Create 3 columns to represent the physical network path
-        node_alice, route, node_bob = st.columns([1, 2, 1])
-        
-        with node_alice:
-            st.info("💻 **Alice (Client)**\n\nInitiating Session")
-        with node_bob:
-            st.info("🖥️ **Bob (Server)**\n\nListening...")
-            
-        with route:
-            route_ui = st.empty()
-            if eve_active:
-                route_ui.error("🕵️ **Eve (Attacker/MITM)**\n\nForged Cert Active. Silently Intercepting Data...")
-            else:
-                route_ui.success("✅ **Secure Route**\n\nDirect Connection Established")
+        try:
+            with open("quantum_visuals.html", "r", encoding="utf-8") as f:
+                html_content = f.read()
+            js_boolean = "true" if eve_active else "false"
+            html_content = html_content.replace("REPLACE_ME_EVE_ACTIVE", js_boolean)
+            components.html(html_content, height=400)
+        except FileNotFoundError:
+            st.error("⚠️ quantum_visuals.html file not found.")
 
         st.divider()
-        
-        # --- 2. ANIMATED PACKET TRANSMISSION ---
         st.markdown("### 📦 Packet Interception Feed")
         log_window = st.empty()
         
         if eve_active:
-            # Simulate the silent classical attack first
             log_window.warning("⏳ [CLASSICAL LAYER] Alice sending RSA ClientHello packet...")
             time.sleep(1.5)
             log_window.error("🚨 [CLASSICAL LAYER] Eve intercepted ClientHello! Forwarding spoofed packet to Bob...")
@@ -91,8 +90,6 @@ else:
             time.sleep(1.5)
             log_window.error("🚨 [CLASSICAL LAYER] Eve intercepts and swaps in a forged RSA certificate! Alice accepts it.")
             time.sleep(2)
-            
-            # Transition to Quantum Defense
             log_window.info("🛡️ [QUANTUM LAYER] Classical handshake compromised. Initiating SD-QKD Key Exchange...")
             time.sleep(1.5)
             log_window.warning("⏳ [QUANTUM LAYER] Alice sending entangled Bell states (Qubits)...")
@@ -111,8 +108,7 @@ else:
             log_window.success("⏳ [QUANTUM LAYER] Alice sending entangled Bell states (Qubits)...")
             time.sleep(1.5)
 
-        # Execute simulation backend
-        result = run_simulation(key_size, eve_active)
+        result = run_simulation(key_size, eve_active, num_shots)
         log_simulation(key_size, num_shots, eve_active, result["qber_value"], result["threshold"], result["status"], result["kill_switch_triggered"])
         
         if eve_active:
@@ -122,12 +118,10 @@ else:
             
         time.sleep(1.5)
         
-        # --- 3. METRICS AND KILL-SWITCH DISPLAY ---
         st.subheader("Real-Time Telemetry Metrics")
         col1, col2, col3 = st.columns(3)
         col1.metric("Transmitted Key (Alice)", result["sent_key"])
         
-        # Highlight if the received key was tampered with
         if eve_active:
             col2.error(f"Received Key (Bob) - CORRUPTED\n\n{result['received_key']}")
         else:
@@ -137,7 +131,7 @@ else:
         col3.metric(
             "Measured QBER", 
             f"{result['qber_value']}%", 
-            delta=f"{result['qber_value'] - result['threshold']:.1f}% vs Threshold", 
+            delta=f"{result['qber_value'] - result['threshold']:.2f}% vs Threshold", 
             delta_color=delta_color
         )
         
