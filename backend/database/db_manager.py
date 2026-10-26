@@ -3,8 +3,9 @@ import bcrypt
 from datetime import datetime
 import time
 import uuid
+from pathlib import Path
 
-DB_NAME = "sd_qkd_results.db"
+DB_NAME = str(Path(__file__).resolve().parents[2] / "sd_qkd_results.db")
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)

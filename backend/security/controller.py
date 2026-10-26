@@ -1,9 +1,9 @@
 import random
 from qiskit_aer import Aer
-from quantum.bell_pairs import create_bell_pair
-from quantum.superdense import encode_message, decode_message
-from quantum.channel import transmit_channel
-from security.qber import calculate_organic_qber
+from backend.quantum.bell_pairs import create_bell_pair
+from backend.quantum.superdense import encode_message, decode_message
+from backend.quantum.channel import transmit_channel
+from backend.security.qber import calculate_organic_qber
 
 def run_simulation(key_size=16, eve_active=False, num_shots=1024):
     if key_size % 2 != 0: key_size += 1 
