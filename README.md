@@ -33,3 +33,14 @@ sd_qkd_results.db              Local SQLite data store
 ```
 
 The public overview and account links stay in the same browser tab. Create an account, then use the sign-in link to continue to the simulation workspace.
+
+## Email verification setup
+
+New registrations are activated only after a one-time code is sent to and entered from the supplied email address. Configure an SMTP account before enabling registration:
+
+1. Create the `.streamlit` folder in the project root if it does not exist.
+2. Copy `streamlit_secrets.example.toml` to `.streamlit/secrets.toml`.
+3. Replace the sample values with the SMTP host, port, username, password, and sender address from your email provider. For providers that require it, use an app password rather than your normal mailbox password.
+4. Keep `.streamlit/secrets.toml` private. The `.streamlit/` folder is excluded from Git.
+
+Codes expire after 10 minutes, are single-use, allow up to five entry attempts, and new code requests are limited to one per minute. Existing local accounts remain available after the database migration; new accounts are stored only after email verification.

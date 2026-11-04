@@ -1,4 +1,4 @@
-"""Public landing page based on the SD-QKD Figma design."""
+"""Public landing page for my laptop."""
 
 import base64
 from pathlib import Path

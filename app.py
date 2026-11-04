@@ -9,7 +9,10 @@ from backend.database.db_manager import (
     create_session,
     verify_session,
     destroy_session,
+    issue_registration_code,
+    confirm_registration,
 )
+from backend.security.email_service import send_verification_email
 from frontend.quantum_background import render_quantum_background
 
 AUTH_ARTWORK = b64encode(
@@ -97,26 +100,60 @@ def render_auth_page(mode: str = "signin", expired_session: bool = False) -> Non
         st.markdown('<a href="/" target="_self">← Back to project overview</a>', unsafe_allow_html=True)
         if mode == "signup":
             st.markdown("### Create researcher account")
-            st.caption("Register to enter the simulation workspace.")
+            st.caption("Verify your email address to activate a researcher account.")
             show_password = st.checkbox("Show password while typing", key="signup_show_password")
-            with st.form("register_form", clear_on_submit=True):
+            with st.form("register_form", clear_on_submit=False):
+                reg_email = st.text_input("Email address", placeholder="you@example.com")
                 reg_user = st.text_input("Choose a username", placeholder="e.g. researcher01")
                 password_type = "default" if show_password else "password"
                 reg_pass = st.text_input("Create a password", type=password_type, placeholder="Use a strong password")
                 reg_confirm = st.text_input("Confirm password", type=password_type, placeholder="Re-enter your password")
-                register_submit = st.form_submit_button("Create researcher account", type="primary", width="stretch")
+                register_submit = st.form_submit_button("Send verification code", type="primary", width="stretch")
             if register_submit:
+                email = reg_email.strip().lower()
                 user = reg_user.strip()
-                if not user or not reg_pass:
-                    st.warning("Enter both a username and password.")
+                if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+                    st.warning("Enter a valid email address.")
+                elif not user or not reg_pass:
+                    st.warning("Enter an email address, username, and password.")
                 elif reg_pass != reg_confirm:
                     st.warning("The passwords do not match.")
                 elif len(reg_pass) < 8:
                     st.warning("Use a password with at least 8 characters.")
-                elif register_user(user, reg_pass):
-                    st.success("Account created. Sign in to continue.")
                 else:
-                    st.error("That username already exists.")
+                    try:
+                        code = issue_registration_code(email, user, reg_pass)
+                        st.session_state["pending_registration_email"] = email
+                        send_verification_email(email, code)
+                        st.success("Verification code sent. Check your inbox and spam folder.", icon=":material/mark_email_read:")
+                    except (ValueError, RuntimeError) as exc:
+                        st.error(str(exc))
+
+            pending_email = st.session_state.get("pending_registration_email")
+            if pending_email:
+                st.markdown("#### Verify your email")
+                st.caption(f"Enter the 6-digit code sent to {pending_email}. It expires after 10 minutes.")
+                with st.form("verify_email_form"):
+                    code_entry = st.text_input("Verification code", max_chars=6, placeholder="000000")
+                    verify_submit = st.form_submit_button("Verify email and create account", type="primary", width="stretch")
+                if verify_submit:
+                    verified, message = confirm_registration(pending_email, code_entry)
+                    if verified:
+                        st.session_state.pop("pending_registration_email", None)
+                        st.success(message)
+                    else:
+                        st.error(message)
+                if st.button("Resend code", key="resend_email_code"):
+                    try:
+                        # Issue a fresh challenge using the credentials in the form above.
+                        if not reg_user.strip() or not reg_pass or reg_pass != reg_confirm:
+                            st.error("Re-enter the same username and matching password above before requesting a new code.")
+                        else:
+                            code = issue_registration_code(pending_email, reg_user.strip(), reg_pass)
+                            send_verification_email(pending_email, code)
+                            st.success("A new verification code was sent.")
+                    except (ValueError, RuntimeError) as exc:
+                        st.error(str(exc))
             st.markdown('Already have an account? <a href="?account=signin" target="_self">Sign in</a>', unsafe_allow_html=True)
         else:
             st.markdown("### Welcome back")

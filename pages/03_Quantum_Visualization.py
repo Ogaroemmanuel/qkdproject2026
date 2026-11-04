@@ -68,6 +68,12 @@ if saved:
         "backendStatus": str(result.get("status", "Completed")),
         "keySize": int(saved["key_size"]),
         "shots": int(saved["num_shots"]),
+        "sentMessage": str(result.get("sent_key", "")),
+        "receivedMessage": str(result.get("received_key", "")),
+        "firstPair": (result.get("pair_results") or [{}])[0],
+        "errorBits": int(result.get("error_bits", 0)),
+        "totalBits": int(result.get("total_bits", saved["key_size"] * saved["num_shots"])),
+        "modelVersion": "superdense-bit-order-corrected-v2",
         "previewMode": False,
     }
 else:
@@ -79,6 +85,12 @@ else:
         "backendStatus": "Interactive preview · run an experiment to show measured results",
         "keySize": 16,
         "shots": 1024,
+        "sentMessage": "",
+        "receivedMessage": "",
+        "firstPair": {},
+        "errorBits": 0,
+        "totalBits": 0,
+        "modelVersion": "preview",
         "previewMode": True,
     }
 

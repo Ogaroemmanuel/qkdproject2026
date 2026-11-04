@@ -10,8 +10,8 @@ st.markdown(
     """
     <div class="hero">
       <div class="eyebrow">Research console / live experiment</div>
-      <h1>Quantum key exchange</h1>
-      <p>Set the channel conditions, run the experiment, then follow the exchange in the immersive lab view.</p>
+        <h1>Superdense-coding experiment</h1>
+      <p>Configure the two-qubit circuit and replay its encoded message, modeled channel interception, Bob’s decode, and error-rate decision.</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -22,7 +22,7 @@ with st.container(border=True):
     with st.form("simulation_config_form"):
         left, middle, right = st.columns([0.9, 1.25, 1.1], gap="large", vertical_alignment="center")
         with left:
-            key_size = st.selectbox("Key sequence", [8, 16, 32], index=1, format_func=lambda size: f"{size} bits")
+            key_size = st.selectbox("Message length", [8, 16, 32], index=1, format_func=lambda size: f"{size} bits")
         with middle:
             num_shots = st.slider("Measurement shots", min_value=128, max_value=4096, value=1024, step=128)
         with right:
@@ -63,29 +63,29 @@ if saved:
 
     st.markdown("#### Latest result")
     metric_cols = st.columns(3)
-    metric_cols[0].metric("QBER", f"{qber:.2f}%", delta=f"{qber - threshold:+.2f}% vs limit", delta_color="inverse")
+    metric_cols[0].metric("Decoded bit-error rate", f"{qber:.2f}%", delta=f"{qber - threshold:+.2f}% vs limit", delta_color="inverse", help="Error fraction over decoded message bits in this software circuit; not a sifted-key QBER from a complete BB84/DI-QKD protocol.")
     metric_cols[1].metric("Security decision", "Interrupted" if killed else "Accepted")
     metric_cols[2].metric("Interception", "Active" if saved["eve_active"] else "Inactive")
 
     if killed:
-        st.error("The security controller interrupted this simulated session after evaluating the channel.", icon=":material/gpp_bad:")
+        st.error("The simulated error rate exceeded this run’s configured limit, so the controller interrupted the session.", icon=":material/gpp_bad:")
     else:
-        st.success("The security controller accepted this simulated session.", icon=":material/verified_user:")
+        st.success("The simulated error rate stayed within the configured limit for this run.", icon=":material/verified_user:")
 
     action, context = st.columns([1, 2], vertical_alignment="center")
     with action:
         if st.button("Replay in 3D", icon=":material/view_in_ar:", type="primary", width="stretch"):
             st.switch_page("pages/03_Quantum_Visualization.py")
     with context:
-        st.caption(f"{saved['key_size']} bit sequence · {saved['num_shots']:,} measurement shots · decision limit {threshold:.2f}%")
+        st.caption(f"{saved['key_size']} message bits · {saved['num_shots']:,} circuit shots per encoded pair · decision limit {threshold:.2f}%")
 
     with st.expander("Inspect key outputs"):
         sent, received = st.columns(2, gap="large")
         with sent:
-            st.caption("Alice · transmitted key")
+            st.caption("Alice · encoded message")
             st.code(str(result.get("sent_key", "Not supplied by simulation")), language="text")
         with received:
-            st.caption("Bob · received key")
+            st.caption("Bob · one sampled decoded message")
             st.code(str(result.get("received_key", "Not supplied by simulation")), language="text")
 else:
-    st.caption("Choose the channel settings and run an experiment. The 3D lab opens automatically when the result is ready.")
+    st.caption("This educational superdense-coding simulation is not a complete quantum key-distribution protocol or a physical network. The 3D lab opens when a run finishes.")
