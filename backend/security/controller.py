@@ -6,7 +6,10 @@ from backend.quantum.channel import transmit_channel
 from backend.security.qber import calculate_organic_qber
 
 def run_simulation(key_size=16, eve_active=False, num_shots=1024):
-    if key_size % 2 != 0: key_size += 1 
+    if isinstance(key_size, bool) or not isinstance(key_size, int) or key_size < 2 or key_size % 2:
+        raise ValueError("Message length must be a positive even integer of at least two bits.")
+    if isinstance(num_shots, bool) or not isinstance(num_shots, int) or num_shots < 1:
+        raise ValueError("Measurement shots must be a positive integer.")
     
     sent_key = "".join([str(random.randint(0, 1)) for _ in range(key_size)])
     bob_final_key = ""
@@ -41,6 +44,7 @@ def run_simulation(key_size=16, eve_active=False, num_shots=1024):
         bob_final_key += received_pair
         pair_results.append({
             "sent_bits": bit_pair,
+            "encoding_operation": {"00": "I", "01": "X", "10": "Z", "11": "Z → X"}[bit_pair],
             "received_bits": received_pair,
             "outcome_counts": decoded_counts,
         })

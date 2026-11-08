@@ -1,9 +1,9 @@
 def encode_message(qc, bit_pair):
     """Alice applies Pauli gates to her entangled qubit (q0) to encode 2 classical bits."""
     if bit_pair == "01":
-        qc.z(0)
-    elif bit_pair == "10":
         qc.x(0)
+    elif bit_pair == "10":
+        qc.z(0)
     elif bit_pair == "11":
         qc.z(0)
         qc.x(0)
