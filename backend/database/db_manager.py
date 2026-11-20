@@ -4,9 +4,18 @@ from datetime import datetime
 import secrets
 import time
 import uuid
+import json
+from contextlib import closing
 from pathlib import Path
 
 DB_NAME = str(Path(__file__).resolve().parents[2] / "sd_qkd_results.db")
+
+
+def _ensure_simulation_details(conn):
+    """Add experiment storage to existing databases without replacing records."""
+    conn.execute('''CREATE TABLE IF NOT EXISTS simulation_details (
+        run_id INTEGER PRIMARY KEY REFERENCES simulation_runs(run_id),
+        result_json TEXT NOT NULL)''')
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -28,6 +37,7 @@ def init_db():
         )
     ''')
     
+    _ensure_simulation_details(conn)
     # 2. Users table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -232,17 +242,31 @@ def destroy_session(token):
 
 # --- SIMULATION LOGGING ---
 def log_simulation(key_size, num_shots, eve_active, qber, threshold, status, kill_switch,
-                   model_version="superdense-bit-order-corrected-v2"):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute('''
-        INSERT INTO simulation_runs 
-        (timestamp, key_size, num_shots, eve_active, qber_value, threshold_used, status, kill_switch, model_version)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (timestamp, key_size, num_shots, eve_active, qber, threshold, status, kill_switch, model_version))
-    conn.commit()
-    conn.close()
+                   model_version="superdense-bit-order-corrected-v2", result=None):
+    payload = json.dumps(result, allow_nan=False) if result is not None else None
+    with closing(sqlite3.connect(DB_NAME)) as conn, conn:
+        # A hot-reloaded app may still hold an older startup initializer.
+        # Ensure the additive table at the point of use, in this transaction.
+        _ensure_simulation_details(conn)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor = conn.execute(
+            "INSERT INTO simulation_runs "
+            "(timestamp,key_size,num_shots,eve_active,qber_value,threshold_used,status,kill_switch,model_version) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (timestamp,key_size,num_shots,eve_active,qber,threshold,status,kill_switch,model_version))
+        run_id = cursor.lastrowid
+        if payload is not None:
+            conn.execute("INSERT INTO simulation_details (run_id,result_json) VALUES (?,?)", (run_id,payload))
+    return run_id
+
+
+def fetch_run_result(run_id):
+    with closing(sqlite3.connect(DB_NAME)) as conn:
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='simulation_details'").fetchone():
+            return None
+        row = conn.execute("SELECT result_json FROM simulation_details WHERE run_id=?", (run_id,)).fetchone()
+    return json.loads(row[0]) if row else None
+
 
 def fetch_logs():
     conn = sqlite3.connect(DB_NAME)

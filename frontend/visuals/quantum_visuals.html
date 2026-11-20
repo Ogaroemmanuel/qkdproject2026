@@ -39,6 +39,21 @@
     #event{font-size:10px;color:#d5e3ed;text-align:right;max-width:260px;line-height:1.4}#gesture{position:absolute;bottom:89px;left:50%;transform:translateX(-50%);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:rgba(213,231,244,.55);pointer-events:none;white-space:nowrap}
     @media(max-width:760px){#intro{left:10px;top:10px;width:min(370px,calc(100vw - 20px));padding:12px}h1{font-size:15px}#description{max-width:245px}#stateReadout{padding:7px 8px}#telemetry{right:10px;top:240px;width:160px;padding:11px}.qber{font-size:25px}.reading{font-size:9px}#controls{top:auto;bottom:100px;left:50%;width:max-content;max-width:calc(100vw - 16px);padding:6px;gap:4px}#controls button{padding:7px 8px;font-size:9px}#timeline{left:10px;right:10px;bottom:10px;padding:10px 9px}.steps{justify-content:space-between}.step{gap:3px;font-size:0;flex:0 1 auto}.step b{font-size:9px}.step:not(:last-child)::after{width:clamp(7px,4vw,22px);flex:0 1 auto;margin:0 3px}#event{max-width:none;text-align:left;margin-top:9px;font-size:9px}#gesture{bottom:150px}}
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}
+
+    #stepPicker{background:#0d1c2b;color:#eff8ff;border:1px solid #344660;border-radius:7px;padding:7px;font-size:11px;max-width:140px}
+    #story{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);width:min(720px,calc(100% - 32px));padding:14px 18px;background:rgba(5,12,21,.88);border:1px solid #294153;border-radius:12px;z-index:3;pointer-events:none}
+    #storyTitle{font-size:13px;font-weight:650;color:#9eefff}#storyDescription{font-size:12px;line-height:1.55;color:#e0e9f2;margin-top:5px}
+    #controls{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:calc(100% - 28px);right:14px!important;top:14px!important}#controls button{display:block!important;opacity:.95!important;background:#0d1c2b!important}
+    #quantumPanel{position:absolute;left:14px;top:64px;width:270px;max-height:calc(100% - 190px);overflow:auto;background:rgba(5,12,21,.94);border:1px solid #344660;border-radius:12px;padding:16px;z-index:4;font-size:12px;line-height:1.5}
+    #quantumPanel[hidden]{display:none}.probability-row{display:flex;align-items:center;gap:12px;margin:8px 0}.probability-row meter{width:130px;accent-color:#8adfff}.probability-row span:last-child{margin-left:auto}#coherenceGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:10px}#coherenceGrid span{text-align:center;padding:6px;color:#efebff}#stateNote{color:#b8c9da;margin-top:12px}
+    #controls #prevButton,#controls #nextButton{display:none!important}
+    #replayLabel{position:absolute;left:18px;top:18px;z-index:2;max-width:calc(100% - 36px);color:var(--muted);font-size:11px;line-height:1.5;pointer-events:none}
+    #replayLabel strong{display:block;color:#dcecf6;font-size:12px;font-weight:600}
+    #story[data-outcome="rejected"]{border-color:var(--red)}#story[data-outcome="rejected"] #storyTitle{color:var(--red)}
+    #story[data-outcome="within-limit"]{border-color:var(--green)}#story[data-outcome="within-limit"] #storyTitle{color:var(--green)}
+    #story[data-outcome="inconclusive"]{border-color:var(--amber)}#story[data-outcome="inconclusive"] #storyTitle{color:var(--amber)}
+    @media(max-width:760px){#replayLabel{top:68px;left:14px;font-size:10px}#replayLabel strong{font-size:11px}}
+    @media(max-width:600px){#story{bottom:10px;padding:10px}#storyDescription{font-size:11px}#controls button{padding:8px 7px;font-size:10px}#quantumPanel{width:240px;top:58px}}
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -46,6 +61,7 @@
 <body>
 <div id="immersive-root">
   <div id="scene" aria-label="Interactive three-dimensional quantum key exchange lab"></div>
+  <div id="replayLabel"><strong>Representative two-bit exchange</strong>20-second replay · final status summarizes the run</div>
   <section id="intro" class="hud">
     <div class="eyebrow">SD circuit · channel replay</div>
     <h1>Alice → quantum channel → Bob</h1>
@@ -62,13 +78,15 @@
   <section id="telemetry" class="hud">
     <div class="micro">Measured channel error</div>
     <div class="qber" id="qber">—</div>
-    <div class="sub">Decoded-message bit-error rate · configured limit <b id="threshold">—</b></div>
+    <div class="sub">Disclosed probe-bit error estimate · application limit <b id="threshold">—</b></div>
     <div class="meter"><i id="meterFill"></i></div>
     <div class="reading"><span>Interception</span><b id="eve">—</b></div>
     <div class="reading"><span>Message length</span><b id="keySize">—</b></div>
     <div class="reading"><span>Measurements</span><b id="shots">—</b></div>
   </section>
   <section id="controls" class="hud">
+    <select id="stepPicker" aria-label="Choose a process step"><option value="0">Initialize</option><option value="1">Superposition</option><option value="2">Entangle</option><option value="3">Encode</option><option value="4">Transmit / Eve</option><option value="5">Decode</option><option value="6">Count</option><option value="7">Decision</option></select>
+    <button id="theoryButton" type="button" aria-expanded="false" aria-controls="quantumPanel">Explore state</button>
     <button id="prevButton" type="button" aria-label="Previous stage">←</button>
     <button id="playButton" type="button">Pause replay</button>
     <button id="nextButton" type="button" aria-label="Next stage">→</button>
@@ -82,6 +100,8 @@
     </div>
     <div id="event">Loading quantum optics laboratory…</div>
   </section>
+  <section id="story" aria-live="polite"><div id="storyTitle"></div><div id="storyDescription"></div></section>
+  <aside id="quantumPanel" hidden><strong>First encoded pair · quantum state</strong><p>Probabilities in basis order q0q1</p><div id="probabilityRows"></div><p>Density matrix magnitude |ρ|<br>Rows and columns: 00, 01, 10, 11<br>Violet: positive · amber: negative real phase</p><div id="coherenceGrid"></div><div id="stateNote"></div><p>Qubit spheres, arrows, and the dashed link are explanatory markers. A Bell pair is one joint state.</p></aside>
   <script>
     const CONFIG = __CONFIG_JSON__;
     const host = document.getElementById('scene');
@@ -100,7 +120,7 @@
     ui.qber.textContent=preview?'—':`${qber.toFixed(2)}%`; ui.threshold.textContent=`${threshold.toFixed(2)}%`;
     ui.eve.textContent=attacked?'ACTIVE':'OFF'; ui.keySize.textContent=`${CONFIG.keySize} bits`; ui.shots.textContent=Number(CONFIG.shots).toLocaleString();
     ui.meter.style.width=`${Math.min(100,(qber/Math.max(1,threshold*1.8))*100)}%`;
-    ui.decisionText.textContent=preview?'INTERACTIVE PREVIEW':rejected?'SIMULATED · LIMIT EXCEEDED':'SIMULATED · WITHIN LIMIT';
+    ui.decisionText.textContent=preview?'INTERACTIVE PREVIEW':String(CONFIG.backendStatus||'Completed').toUpperCase();
     if(rejected){ui.decision.style.color='var(--red)';ui.qber.style.color='var(--red)';ui.meter.style.background='var(--red)'}
     if(preview) document.getElementById('description').textContent='Interactive replay preview. Run an experiment to populate the encoded pair, measurement outcomes, and controller result.';
     else document.getElementById('description').textContent='Replay of the completed superdense-coding circuit. Optical hardware and state markers are schematic; each result is taken from the simulator.';
@@ -114,8 +134,9 @@
     const operation=pair.encoding_operation||operationByBits[firstBits]||'I / X / Z';
     const bellState=bellByBits[firstBits]||'|Φ⁺⟩';
     const outcomeCounts=pair.outcome_counts||{};
+    const outcomeShotCount=Object.values(outcomeCounts).reduce((sum,count)=>sum+Number(count),0);
     const outcomeText=Object.entries(outcomeCounts).sort((a,b)=>a[0].localeCompare(b[0])).map(([bits,count])=>`${bits}: ${Number(count).toLocaleString()}`).join(' · ');
-    const replayDuration=30000,stepDuration=replayDuration/6;
+    const replayDuration=20000,stepDuration=replayDuration/6;
     let replayStart=performance.now(),pausedAt=null,pinnedStage=null,previousStage=-1;
     const stageDescriptions=[
       'Bell-pair resource prepared in the two-qubit circuit',
@@ -143,26 +164,32 @@
       ui.stateCaption.textContent=captions[stage];
       ui.stateMessage.textContent=stage===0?'Circuit wires: q0 is encoded and sent · q1 is kept for Bob’s joint Bell decode.':(stage>=4&&CONFIG.sentMessage)?`Alice message ${CONFIG.sentMessage} · Bob sampled output ${CONFIG.receivedMessage}`:firstBits?`First pair: Alice ${firstBits}${firstReceived?` · sampled Bob output ${firstReceived}`:''}`:'Run an experiment to populate the first pair and Bob’s sampled output.';
       if(stage===5&&preview)ui.stateOutcomes.textContent='Preview only · run an experiment to load measured outcomes and a controller decision.';
-      else if(stage===5){const bits=Number(CONFIG.totalBits||0),errors=Number(CONFIG.errorBits||0);ui.stateOutcomes.textContent=`Aggregate decoded-bit errors: ${errors.toLocaleString()} / ${bits.toLocaleString()} (${qber.toFixed(2)}%) · ${rejected?'limit exceeded; kill-switch triggered':'within limit; session accepted'}.`;}
-      else ui.stateOutcomes.textContent=outcomeText?`First-pair counts (${Number(CONFIG.shots).toLocaleString()} shots): ${outcomeText}`:`Aggregate errors: ${Number(CONFIG.errorBits||0).toLocaleString()} / ${Number(CONFIG.totalBits||0).toLocaleString()} bits`;
+      else if(stage===5){const bits=Number(CONFIG.totalBits||0),errors=Number(CONFIG.errorBits||0);ui.stateOutcomes.textContent=`Aggregate decoded-bit errors: ${errors.toLocaleString()} / ${bits.toLocaleString()} (${qber.toFixed(2)}%) · ${CONFIG.backendStatus||'Completed'}.`;}
+      else ui.stateOutcomes.textContent=outcomeText?`First-pair counts (${outcomeShotCount.toLocaleString()} payload trials): ${outcomeText}`:`Aggregate errors: ${Number(CONFIG.errorBits||0).toLocaleString()} / ${Number(CONFIG.totalBits||0).toLocaleString()} bits`;
     }
     function currentElapsed(now){return pausedAt===null?now-replayStart:pausedAt-replayStart;}
-    function currentStage(now){if(pinnedStage!==null)return pinnedStage;return Math.floor(Math.max(0,currentElapsed(now))/stepDuration)%6;}
+    function currentStage(now){if(pinnedStage!==null)return pinnedStage;return Math.min(5,Math.floor(Math.max(0,currentElapsed(now))/stepDuration));}
     document.getElementById('exitButton').addEventListener('click',returnToSimulation);
-    document.getElementById('prevButton').addEventListener('click',()=>{const now=performance.now();pinnedStage=Math.max(0,currentStage(now)-1);pausedAt=now;document.getElementById('playButton').textContent='Resume';paintStage(pinnedStage);});
-    document.getElementById('nextButton').addEventListener('click',()=>{const now=performance.now();pinnedStage=Math.min(5,currentStage(now)+1);pausedAt=now;document.getElementById('playButton').textContent='Resume';paintStage(pinnedStage);});
-    document.getElementById('playButton').addEventListener('click',event=>{const now=performance.now();if(pausedAt===null){pausedAt=now;pinnedStage=currentStage(now);event.currentTarget.textContent='Resume';}else{replayStart=now-pinnedStage*stepDuration;pausedAt=null;pinnedStage=null;event.currentTarget.textContent='Pause replay';}});
-    document.getElementById('replayButton').addEventListener('click',()=>{replayStart=performance.now();pausedAt=null;pinnedStage=null;previousStage=-1;document.getElementById('playButton').textContent='Pause replay';});
+    function seekStage(index){
+      const now=performance.now();pinnedStage=Math.max(0,Math.min(5,index));
+      replayStart=now-(pinnedStage+.1)*stepDuration;pausedAt=now;
+      document.getElementById('playButton').textContent='Resume';paintStage(pinnedStage);
+    }
+    document.getElementById('prevButton').addEventListener('click',()=>seekStage(currentStage(performance.now())-1));
+    document.getElementById('nextButton').addEventListener('click',()=>seekStage(currentStage(performance.now())+1));
+    function restartReplay(){replayStart=performance.now();pausedAt=null;pinnedStage=null;previousStage=-1;document.getElementById('playButton').textContent='Pause replay';}
+    document.getElementById('playButton').addEventListener('click',event=>{const now=performance.now();if(currentElapsed(now)>=replayDuration-1){restartReplay();}else if(pausedAt===null){pausedAt=now;pinnedStage=currentStage(now);event.currentTarget.textContent='Resume';}else{replayStart+=now-pausedAt;pausedAt=null;pinnedStage=null;event.currentTarget.textContent='Pause replay';}});
+    document.getElementById('replayButton').addEventListener('click',restartReplay);
     paintStage(0);
 
     const scene=new THREE.Scene();scene.background=new THREE.Color(0x07101b);scene.fog=new THREE.FogExp2(0x07101b,.023);
     const camera=new THREE.PerspectiveCamera(44,1,.1,120);let orbit={theta:.12,phi:1.18,radius:18};
-    const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.8));renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.82;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;host.appendChild(renderer.domElement);
-    scene.add(new THREE.HemisphereLight(0xb9c8d7,0x10151c,.72));
+    const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.8));renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;host.appendChild(renderer.domElement);
+    scene.add(new THREE.HemisphereLight(0xf1f4ff,0x48413a,1.2));
     const key=new THREE.DirectionalLight(0xe8f0f8,2.8);key.position.set(-5,10,7);key.castShadow=true;key.shadow.mapSize.set(2048,2048);key.shadow.camera.left=-18;key.shadow.camera.right=18;key.shadow.camera.top=14;key.shadow.camera.bottom=-14;scene.add(key);
     const fill=new THREE.DirectionalLight(0x879bab,.72);fill.position.set(8,5,-7);scene.add(fill);
-    const cyanLight=new THREE.PointLight(0x29dfff,7,14,1.8);cyanLight.position.set(-6,2,2);scene.add(cyanLight);
-    const blueLight=new THREE.PointLight(0x487eff,6,14,1.8);blueLight.position.set(6,2,-1);scene.add(blueLight);
+    const cyanLight=new THREE.PointLight(0x29dfff,1.6,14,1.8);cyanLight.position.set(-6,2,2);scene.add(cyanLight);
+    const blueLight=new THREE.PointLight(0x487eff,1.5,14,1.8);blueLight.position.set(6,2,-1);scene.add(blueLight);
     const redLight=new THREE.PointLight(0xff274d,attacked?9:0,8,1.7);redLight.position.set(0,3.1,1);scene.add(redLight);
     const measureLight=new THREE.PointLight(0x75ffd0,0,5,1.8);measureLight.position.set(5.6,1,.2);scene.add(measureLight);
     const decisionLight=new THREE.PointLight(rejected?0xff365c:0x53ffb5,0,7,1.8);decisionLight.position.set(0,2.5,-1);scene.add(decisionLight);
@@ -182,6 +209,12 @@
       if(!hardwareLoader)return;
       hardwareLoader.load(url,gltf=>{const model=gltf.scene;model.position.set(...position);model.scale.setScalar(scale);model.rotation.y=rotationY;model.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true;}});parent.add(model);},undefined,error=>console.warn('3D device asset failed to load:',url,error));
     }
+    let laptopPromise=null;
+    function loadLaptop(parent,position,width){
+      if(!hardwareLoader||!CONFIG.hardwareModel)return;
+      if(!laptopPromise)laptopPromise=new Promise((resolve,reject)=>hardwareLoader.load(CONFIG.hardwareModel,gltf=>resolve(gltf.scene),undefined,reject));
+      laptopPromise.then(source=>{const model=source.clone(true);const bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3());const scale=width/size.x;model.scale.setScalar(scale);model.position.set(position[0]-center.x*scale,position[1]-bounds.min.y*scale,position[2]-center.z*scale);model.traverse(n=>{if(n.isMesh){n.castShadow=true;n.receiveShadow=true;}});parent.add(model);}).catch(error=>{console.error('Local laptop failed to load',error);document.getElementById('storyDescription').textContent='Hardware model could not load; refresh the viewer.';});
+    }
     function makeConsole(x,color,label){
       const g=new THREE.Group();g.position.set(x,-.02,0);scene.add(g);
       const graphite=mat(0x26313a,.66,.34),edge=mat(0x78838a,.7,.3);
@@ -189,10 +222,7 @@
       const desk=addBox(g,[3.8,.14,1.65],[0,-.1,-1.12],mat(0x3d4850,.58,.34));
       for(const sx of [-1.6,1.6])for(const sz of [-.48,.48])addBox(g,[.12,1.5,.12],[sx,-.9,sz-1.12],graphite);
       addBox(g,[3.75,.08,.09],[0,-1.78,-1.12],edge);
-      loadRealDevice('https://cdn.3dassets.dev/assets/38831/v1/model.glb',g,[0,.02,-1.14],2.7,label==='BOB'?Math.PI:0);
-      loadRealDevice('https://cdn.3dassets.dev/assets/38829/v1/model.glb',g,[1.25,-2.22,-1.06],2.8,label==='BOB'?Math.PI:0);
-      loadRealDevice('https://cdn.3dassets.dev/assets/38837/v1/model.glb',g,[-.12,-.02,-.28],2.7,label==='BOB'?Math.PI:0);
-      loadRealDevice('https://cdn.3dassets.dev/assets/38870/v1/model.glb',g,[1.0,-2.18,-.35],6.5);
+      loadLaptop(g,[0,.02,-1.12],2.8);
       const led=addCylinder(g,.045,.045,.025,[1.05,-.36,-.52],new THREE.MeshBasicMaterial({color}),16);led.rotation.x=Math.PI/2;
       return {group:g,led};
     }
@@ -286,7 +316,7 @@
     // Eve's operator station sits behind the inline optical tap, with a human
     // silhouette at the console to make the interception action legible.
     const operator=new THREE.Group();operator.position.set(0,-.35,1.42);operator.visible=attacked;scene.add(operator);
-    const suit=mat(attacked?0x5b2631:0x263442,.18,.62), skin=mat(0xb78366,.08,.68);
+    const suit=mat(0x172232,.18,.7), skin=mat(0x92725f,.08,.72);
     // Scaled spheres keep the human figure compatible with the bundled r128 build.
     const torso=new THREE.Mesh(new THREE.SphereGeometry(1,20,16),suit);torso.scale.set(.34,.61,.31);torso.position.set(0,.55,0);operator.add(torso);
     const head=new THREE.Mesh(new THREE.SphereGeometry(.23,20,16),skin);head.position.set(0,1.23,-.04);operator.add(head);
@@ -295,7 +325,7 @@
     const armMat=suit;
     for(const side of [-1,1]){const arm=new THREE.Mesh(new THREE.SphereGeometry(1,16,12),armMat);arm.scale.set(.13,.39,.14);arm.position.set(side*.34,.64,-.34);arm.rotation.x=-.82;arm.rotation.z=side*.32;operator.add(arm);}
     // Operator laptop, angled toward Eve; red only when the attack is enabled.
-    loadRealDevice('https://cdn.3dassets.dev/assets/38821/v1/model.glb',eveGroup,[-.52,.12,.24],2.8);
+    loadLaptop(eveGroup,[0,.35,.8],1.6);
     const branchCurve=new THREE.CatmullRomCurve3([new THREE.Vector3(0,.68,.18),new THREE.Vector3(0,.86,.48),new THREE.Vector3(0,.9,.72),new THREE.Vector3(0,.9,1.02)]);
     const branchCable=new THREE.Mesh(new THREE.TubeGeometry(branchCurve,36,.035,10,false),mat(attacked?0xa6263d:0x36404a,.34,.38,attacked?0x6d1427:0,attacked?.7:0));scene.add(branchCable);
     const interceptRay=new THREE.Mesh(new THREE.TubeGeometry(branchCurve,36,.075,10,false),new THREE.MeshBasicMaterial({color:0xff3455,transparent:true,opacity:attacked?.58:.045,blending:THREE.AdditiveBlending,depthWrite:false}));scene.add(interceptRay);
@@ -304,7 +334,7 @@
     for(let i=0;i<3;i++){const wave=new THREE.Mesh(new THREE.TorusGeometry(.24,.014,6,36),new THREE.MeshBasicMaterial({color:0xff3455,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));wave.rotation.y=Math.PI/2;wave.position.set(0,.69,.02);scene.add(wave);disturbanceRings.push({mesh:wave,offset:i/3});}
 
     // Photon pulses travel along the same illustrated fiber path. Their motion is explanatory, not a literal photon model.
-    const photons=[];const photonMat=new THREE.MeshPhysicalMaterial({color:0xc6fbff,emissive:0x32dfff,emissiveIntensity:1.2,metalness:.02,roughness:.12,clearcoat:1});
+    const photons=[];const photonMat=new THREE.MeshPhysicalMaterial({color:0x65e9ff,emissive:0x119cb0,emissiveIntensity:.9,metalness:.02,roughness:.12,clearcoat:1});
     const disturbedPhotonMat=new THREE.MeshPhysicalMaterial({color:0xffa0ac,emissive:0xff2348,emissiveIntensity:1.8,metalness:.02,roughness:.12,clearcoat:1});
     for(let i=0;i<1;i++){
       const group=new THREE.Group();
@@ -319,7 +349,8 @@
     const q1Core=new THREE.Mesh(new THREE.SphereGeometry(.31,32,24),new THREE.MeshPhysicalMaterial({color:0xb3caff,emissive:0x416eff,emissiveIntensity:.82,metalness:.02,roughness:.12,transmission:.2,transparent:true,opacity:.92,clearcoat:1}));q1Group.add(q1Core);
     const q1Halo=new THREE.Mesh(new THREE.TorusGeometry(.49,.018,8,64),new THREE.MeshBasicMaterial({color:0x72a1ff,transparent:true,opacity:.82}));q1Halo.rotation.x=Math.PI/2;q1Group.add(q1Halo);
     const q1RingB=new THREE.Mesh(new THREE.TorusGeometry(.49,.018,8,64),new THREE.MeshBasicMaterial({color:0x9bc5ff,transparent:true,opacity:.64}));q1RingB.rotation.y=Math.PI/2;q1Group.add(q1RingB);
-    const q1RingC=new THREE.Mesh(new THREE.TorusGeometry(.49,.018,8,64),new THREE.MeshBasicMaterial({color:0x70e7ff,transparent:true,opacity:.52}));q1Group.add(q1RingC);q1Group.position.set(5.55,.72,.15);scene.add(q1Group);
+    const q1RingC=new THREE.Mesh(new THREE.TorusGeometry(.49,.018,8,64),new THREE.MeshBasicMaterial({color:0x70e7ff,transparent:true,opacity:.52}));q1Group.add(q1RingC);q1Group.scale.setScalar(1.28);q1Group.position.set(5.55,.72,.15);scene.add(q1Group);
+    __QUANTUM_EXPLAINER__
     const dustGeo=new THREE.BufferGeometry(),count=500,positions=new Float32Array(count*3);for(let i=0;i<count;i++){positions[i*3]=(Math.random()-.5)*28;positions[i*3+1]=(Math.random()-.5)*13;positions[i*3+2]=(Math.random()-.5)*18;}dustGeo.setAttribute('position',new THREE.BufferAttribute(positions,3));const dust=new THREE.Points(dustGeo,new THREE.PointsMaterial({color:0x82bdd2,size:.025,transparent:true,opacity:.54,sizeAttenuation:true}));scene.add(dust);
 
     // Pointer orbit controls keep the scene usable on desktop and touch screens.
@@ -342,25 +373,34 @@
     }
     function resize(){const w=host.clientWidth||innerWidth,h=host.clientHeight||innerHeight;renderer.setSize(w,h,true);camera.aspect=w/h;camera.updateProjectionMatrix();fitLab(w,h);}new ResizeObserver(resize).observe(host);resize();
 
-    function animate(now){requestAnimationFrame(animate);const elapsed=currentElapsed(now)%replayDuration,stage=currentStage(now);
+    let lastFiberShape="";
+    function animate(now){requestAnimationFrame(animate);
+      // Hold the completed result for the presentation; only Replay starts over.
+      if(pausedAt===null&&currentElapsed(now)>=replayDuration){pausedAt=replayStart+replayDuration-1;pinnedStage=5;document.getElementById('playButton').textContent='Play again';}
+      const elapsed=Math.max(0,Math.min(replayDuration-1,currentElapsed(now))),stage=currentStage(now);
       if(stage!==previousStage){paintStage(stage);previousStage=stage;}
       const transmitProgress=stage<2?0:stage>2?1:Math.max(0,Math.min(1,(elapsed-2*stepDuration)/stepDuration));
-      photons.forEach(p=>{p.group.visible=!(attacked&&rejected&&stage===5);p.group.position.copy(curve.getPoint(transmitProgress));p.group.scale.setScalar(.94+.06*Math.sin(now*.006));p.core.material=attacked&&stage>=2&&transmitProgress>.48?disturbedPhotonMat:photonMat;p.rings.forEach((ring,index)=>{ring.rotation.z=now*.00035*(index%2?-.7:1);ring.material.color.setHex(attacked&&stage>=2&&stage<=3?0xff5368:0x70f1ff);});p.shell.material.emissive.setHex(attacked&&stage>=2&&stage<=3?0x68172a:0x147a9c);});
+      photons.forEach(p=>{p.group.visible=!(attacked&&rejected&&stage===5);p.group.position.copy(curve.getPoint(transmitProgress));p.group.position.y+=1.15;p.group.scale.setScalar(1.28+.06*Math.sin(now*.006));p.core.material=attacked&&stage>=2&&transmitProgress>.48?disturbedPhotonMat:photonMat;p.shell.material.emissive.setHex(attacked&&stage>=2&&stage<=3?0x68172a:0x147a9c);});
+      updateQuantumStory(stage,Math.max(0,Math.min(.999,(elapsed-stage*stepDuration)/stepDuration)),transmitProgress,pausedAt===null?now:pausedAt);
       interceptRay.material.opacity=attacked&&stage===2?.42+.2*Math.sin(now*.009):attacked?.12:.018;
       redLight.intensity=attacked&&stage>=2&&stage<=3?13:attacked?2:0;
       measureLight.intensity=stage===4?5+3*Math.sin(now*.012):0;
       decisionLight.intensity=stage===5?3:0;
       disturbanceRings.forEach(({mesh,offset})=>{const wavePhase=(now*.00055+offset)%1;const active=attacked&&stage>=2&&stage<=3;mesh.scale.setScalar(.55+wavePhase*2.6);mesh.material.opacity=active?(1-wavePhase)*.62:0;});
-      const disturbanceActive=attacked&&stage>=2&&stage<=4;
+      const channelReached=stage>2||(stage===2&&transmitProgress>=.5);
+      const disturbanceActive=(attacked||Number(CONFIG.noiseProbability)>0)&&channelReached&&stage<=4;
       eveGroup.visible=attacked;operator.visible=attacked;branchCable.visible=attacked;interceptRay.visible=attacked;attackHalo.visible=attacked;
-      const split=attacked&&rejected&&stage===5?.72:0;
-      const shake=disturbanceActive?Math.sin(now*.045)*.14:0;
+      const split=rejected&&stage===5?.72:0;
+      const shake=disturbanceActive?Math.sin((pausedAt===null?now:pausedAt)*.045)*(attacked?.14:Math.min(.06,Number(CONFIG.noiseProbability)*.2)):0;
+      const shapeKey=split>0?"split":disturbanceActive?String(Math.round((pausedAt===null?now:pausedAt)/45)):"intact";
+      if(shapeKey!==lastFiberShape){lastFiberShape=shapeKey;
       const points=[];for(let i=0;i<=120;i++){const t=i/120,p=curve.getPoint(t);p.y+=shake*Math.sin(t*Math.PI*9)*(Math.sin(t*Math.PI)**.6);points.push(p);}fiber.visible=fiberGlow.visible=split<=0;if(split<=0){const vibrating=new THREE.CatmullRomCurve3(points);fiber.geometry.dispose();fiber.geometry=new THREE.TubeGeometry(vibrating,120,.035,10,false);fiberGlow.geometry.dispose();fiberGlow.geometry=new THREE.TubeGeometry(vibrating,120,.085,8,false);}severedHalves.forEach(({side,core,glow})=>{core.visible=glow.visible=split>0;if(split>0){const cut=side<0?Math.floor((.5-split*.3)*120):Math.ceil((.5+split*.3)*120);const half=new THREE.CatmullRomCurve3(side<0?points.slice(0,cut):points.slice(cut));core.geometry.dispose();core.geometry=new THREE.TubeGeometry(half,60,.035,10,false);glow.geometry.dispose();glow.geometry=new THREE.TubeGeometry(half,60,.085,8,false);}});
+      }
       const orbitTarget=target;camera.position.set(orbitTarget.x+orbit.radius*Math.sin(orbit.phi)*Math.sin(orbit.theta),orbitTarget.y+orbit.radius*Math.cos(orbit.phi),orbitTarget.z+orbit.radius*Math.sin(orbit.phi)*Math.cos(orbit.theta));camera.lookAt(orbitTarget);
-      alice.group.position.y=-.02+Math.sin(now*.0007)*.018;bob.group.position.y=-.02+Math.sin(now*.0007+1.4)*.018;
+      alice.group.position.y=-.02;bob.group.position.y=-.02;
       eveGroup.position.x=shake*.18;
       alice.led.material.color.setHex(stage===1?0x74f5ff:0x28758a);bob.led.material.color.setHex(stage===3||stage===4?0x77ffd0:0x317d70);
-      eveRing.rotation.z=now*.00035;attackHalo.rotation.z=now*.0005;q1Halo.rotation.z=now*.00065;q1Halo.material.opacity=stage>=3?.95:.62;dust.rotation.y=now*.000006;
+      eveRing.rotation.z=now*.00035;attackHalo.rotation.z=now*.0005;dust.rotation.y=now*.000006;
       renderer.render(scene,camera);
     }
     requestAnimationFrame(animate);

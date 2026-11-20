@@ -1,6 +1,12 @@
 # SD-QKD security lab
 
-Academic Streamlit app for exploring simulated superdense quantum key distribution, authentication decisions, and QBER-based run history. No physical quantum channel is used.
+Academic Streamlit app for exploring superdense coding, sampled channel-disturbance decisions, and experiment history. The circuit is a software model rather than a complete quantum key-distribution or quantum authentication protocol.
+
+The current model uses independent test probes, configurable Pauli channel noise,
+95% simultaneous confidence intervals, and batch rejection that prevents later
+transmissions. Outcomes are Within limit, Rejected, or Inconclusive. Complete v3
+experiments can be downloaded and restored from Reports. See
+[the experiment method](docs/sampled-experiment.md) for the equations and assumptions.
 
 ## Run the app
 
